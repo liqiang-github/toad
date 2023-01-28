@@ -7,19 +7,20 @@ from .metrics import MSE, AIC, BIC, KS, AUC
 from .utils import split_target, unpack_tuple, to_ndarray
 
 
-INTERCEPT_COLS = 'intercept'
+INTERCEPT_COLS = "intercept"
 
 
 class StatsModel:
-    def __init__(self, estimator = 'ols', criterion = 'aic', intercept = False):
+    def __init__(self, estimator="ols", criterion="aic", intercept=False):
         if isinstance(estimator, str):
             Est = self.get_estimator(estimator)
-            estimator = Est(fit_intercept = intercept,)
+            estimator = Est(
+                fit_intercept=intercept,
+            )
 
         self.estimator = estimator
         self.intercept = intercept
         self.criterion = criterion
-
 
     def get_estimator(self, name):
         from sklearn.linear_model import (
@@ -30,22 +31,19 @@ class StatsModel:
         )
 
         ests = {
-            'ols': LinearRegression,
-            'lr': LogisticRegression,
-            'lasso': Lasso,
-            'ridge': Ridge,
+            "ols": LinearRegression,
+            "lr": LogisticRegression,
+            "lasso": Lasso,
+            "ridge": Ridge,
         }
 
         if name in ests:
             return ests[name]
 
-        raise Exception('estimator {name} is not supported'.format(name = name))
-
-
+        raise Exception("estimator {name} is not supported".format(name=name))
 
     def stats(self, X, y):
-        """
-        """
+        """ """
         X = X.copy()
 
         if isinstance(X, pd.Series):
@@ -53,7 +51,7 @@ class StatsModel:
 
         self.estimator.fit(X, y)
 
-        if hasattr(self.estimator, 'predict_proba'):
+        if hasattr(self.estimator, "predict_proba"):
             pre = self.estimator.predict_proba(X)[:, 1]
         else:
             pre = self.estimator.predict(X)
@@ -71,24 +69,24 @@ class StatsModel:
         c = self.get_criterion(pre, y, k)
 
         return {
-            't_value': pd.Series(t_value, index = X.columns),
-            'p_value': pd.Series(p_value, index = X.columns),
-            'criterion': c
+            "t_value": pd.Series(t_value, index=X.columns),
+            "p_value": pd.Series(p_value, index=X.columns),
+            "criterion": c,
         }
 
     def get_criterion(self, pre, y, k):
-        if self.criterion == 'aic':
+        if self.criterion == "aic":
             llf = self.loglikelihood(pre, y, k)
-            return AIC(pre, y, k, llf = llf)
+            return AIC(pre, y, k, llf=llf)
 
-        if self.criterion == 'bic':
+        if self.criterion == "bic":
             llf = self.loglikelihood(pre, y, k)
-            return BIC(pre, y, k, llf = llf)
+            return BIC(pre, y, k, llf=llf)
 
-        if self.criterion == 'ks':
+        if self.criterion == "ks":
             return KS(pre, y)
 
-        if self.criterion == 'auc':
+        if self.criterion == "auc":
             return AUC(pre, y)
 
     def t_value(self, pre, y, X, coef):
@@ -111,9 +109,20 @@ class StatsModel:
         return (-n / 2) * np.log(2 * np.pi * mse * np.e)
 
 
-def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', criterion = 'aic',
-            p_enter = 0.01, p_remove = 0.01, p_value_enter = 0.2, intercept = False,
-            max_iter = None, return_drop = False, exclude = None):
+def stepwise(
+    frame,
+    target="target",
+    estimator="ols",
+    direction="both",
+    criterion="aic",
+    p_enter=0.01,
+    p_remove=0.01,
+    p_value_enter=0.2,
+    intercept=False,
+    max_iter=None,
+    return_drop=False,
+    exclude=None,
+):
     """stepwise to select features
 
     Args:
@@ -137,16 +146,16 @@ def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', cr
     df, y = split_target(frame, target)
 
     if exclude is not None:
-        df = df.drop(columns = exclude)
+        df = df.drop(columns=exclude)
 
     drop_list = []
     remaining = df.columns.tolist()
 
     selected = []
 
-    sm = StatsModel(estimator = estimator, criterion = criterion, intercept = intercept)
+    sm = StatsModel(estimator=estimator, criterion=criterion, intercept=intercept)
 
-    order = -1 if criterion in ['aic', 'bic'] else 1
+    order = -1 if criterion in ["aic", "bic"] else 1
 
     best_score = -np.inf * order
 
@@ -158,15 +167,15 @@ def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', cr
 
         l = len(remaining)
         test_score = np.zeros(l)
-        test_res = np.empty(l, dtype = np.object)
+        test_res = np.empty(l, dtype=np.object)
 
-        if direction == 'backward':
+        if direction == "backward":
             for i in range(l):
                 test_res[i] = sm.stats(
-                    df[ remaining[:i] + remaining[i+1:] ],
+                    df[remaining[:i] + remaining[i + 1 :]],
                     y,
                 )
-                test_score[i] = test_res[i]['criterion']
+                test_score[i] = test_res[i]["criterion"]
 
             curr_ix = np.argmax(test_score * order)
             curr_score = test_score[curr_ix]
@@ -183,10 +192,10 @@ def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', cr
         else:
             for i in range(l):
                 test_res[i] = sm.stats(
-                    df[ selected + [remaining[i]] ],
+                    df[selected + [remaining[i]]],
                     y,
                 )
-                test_score[i] = test_res[i]['criterion']
+                test_score[i] = test_res[i]["criterion"]
 
             curr_ix = np.argmax(test_score * order)
             curr_score = test_score[curr_ix]
@@ -205,15 +214,15 @@ def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', cr
             selected.append(name)
             best_score = curr_score
 
-            if direction == 'both':
-                p_values = test_res[curr_ix]['p_value']
+            if direction == "both":
+                p_values = test_res[curr_ix]["p_value"]
                 drop_names = p_values[p_values > p_value_enter].index
 
                 for name in drop_names:
                     selected.remove(name)
                     drop_list.append(name)
 
-    r = frame.drop(columns = drop_list)
+    r = frame.drop(columns=drop_list)
 
     res = (r,)
     if return_drop:
@@ -222,8 +231,7 @@ def stepwise(frame, target = 'target', estimator = 'ols', direction = 'both', cr
     return unpack_tuple(res)
 
 
-def drop_empty(frame, threshold = 0.9, nan = None, return_drop = False,
-            exclude = None):
+def drop_empty(frame, threshold=0.9, nan=None, return_drop=False, exclude=None):
     """drop columns by empty
 
     Args:
@@ -248,15 +256,15 @@ def drop_empty(frame, threshold = 0.9, nan = None, return_drop = False,
     drop_list = []
     for col in cols:
         series = frame[col]
-        
+
         if nan is not None:
             series = series.replace(nan, np.nan)
-        
+
         n = series.isnull().sum()
         if n > threshold:
             drop_list.append(col)
 
-    r = frame.drop(columns = drop_list)
+    r = frame.drop(columns=drop_list)
 
     res = (r,)
     if return_drop:
@@ -265,7 +273,7 @@ def drop_empty(frame, threshold = 0.9, nan = None, return_drop = False,
     return unpack_tuple(res)
 
 
-def drop_var(frame, threshold = 0, return_drop = False, exclude = None):
+def drop_var(frame, threshold=0, return_drop=False, exclude=None):
     """drop columns by variance
 
     Args:
@@ -281,25 +289,26 @@ def drop_var(frame, threshold = 0, return_drop = False, exclude = None):
     df = frame.copy()
 
     if exclude is not None:
-        df = df.drop(columns = exclude)
+        df = df.drop(columns=exclude)
 
     # numeric features only
-    df = df.select_dtypes(include = 'number')
+    df = df.select_dtypes(include="number")
 
-    variances = np.var(df, axis = 0)
+    variances = np.var(df, axis=0)
     drop_list = df.columns[variances <= threshold]
 
-    r = frame.drop(columns = drop_list)
+    r = frame.drop(columns=drop_list)
 
     res = (r,)
     if return_drop:
-        res += (drop_list)
+        res += drop_list
 
     return unpack_tuple(res)
 
 
-def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
-            return_drop = False, exclude = None):
+def drop_corr(
+    frame, target=None, threshold=0.7, by="IV", return_drop=False, exclude=None
+):
     """drop columns by correlation
 
     Args:
@@ -315,14 +324,13 @@ def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
         array: list of feature names that has been dropped
     """
     if not isinstance(by, (str, pd.Series)):
-        by = pd.Series(by, index = frame.columns)
+        by = pd.Series(by, index=frame.columns)
 
     cols = frame.columns.copy()
 
     if exclude is not None:
         exclude = exclude if isinstance(exclude, (list, np.ndarray)) else [exclude]
         cols = cols.drop(exclude)
-
 
     f, t = split_target(frame[cols], target)
 
@@ -338,20 +346,18 @@ def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
         # get the graph of relationship
         graph = np.hstack([ix.reshape((-1, 1)), cn.reshape((-1, 1))])
 
-        uni, counts = np.unique(graph, return_counts = True)
+        uni, counts = np.unique(graph, return_counts=True)
 
         # calc weights for nodes
         weights = np.zeros(len(corr.index))
 
-
         if isinstance(by, pd.Series):
             weights = by[corr.index].values
-        elif by.upper() == 'IV':
+        elif by.upper() == "IV":
             for ix in uni:
-                weights[ix] = IV(frame[corr.index[ix]], target = t)
+                weights[ix] = IV(frame[corr.index[ix]], target=t)
 
-
-        while(True):
+        while True:
             # TODO deal with circle
 
             # get nodes with the most relationship
@@ -362,7 +368,7 @@ def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
 
             # get nodes of 1 degree relationship of n
             i, c = np.where(graph == n)
-            pairs = graph[(i, 1-c)]
+            pairs = graph[(i, 1 - c)]
 
             # if sum of 1 degree nodes greater than n
             # then delete n self
@@ -377,18 +383,17 @@ def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
 
             # delete nodes from graph
             di, _ = np.where(np.isin(graph, dro))
-            graph = np.delete(graph, di, axis = 0)
+            graph = np.delete(graph, di, axis=0)
 
             # if graph is empty
             if len(graph) <= 0:
                 break
 
             # update nodes and counts
-            uni, counts = np.unique(graph, return_counts = True)
-
+            uni, counts = np.unique(graph, return_counts=True)
 
     drop_list = corr.index[drops].values
-    r = frame.drop(columns = drop_list)
+    r = frame.drop(columns=drop_list)
 
     res = (r,)
     if return_drop:
@@ -397,8 +402,14 @@ def drop_corr(frame, target = None, threshold = 0.7, by = 'IV',
     return unpack_tuple(res)
 
 
-def drop_iv(frame, target = 'target', threshold = 0.02, return_drop = False,
-            return_iv = False, exclude = None):
+def drop_iv(
+    frame,
+    target="target",
+    threshold=0.02,
+    return_drop=False,
+    return_iv=False,
+    exclude=None,
+):
     """drop columns by IV
 
     Args:
@@ -425,24 +436,24 @@ def drop_iv(frame, target = 'target', threshold = 0.02, return_drop = False,
     iv = np.zeros(l)
 
     for i in range(l):
-        iv[i] = IV(f[f.columns[i]], target = t)
+        iv[i] = IV(f[f.columns[i]], target=t)
 
     drop_ix = np.where(iv < threshold)
 
     drop_list = f.columns[drop_ix].values
-    df = frame.drop(columns = drop_list)
+    df = frame.drop(columns=drop_list)
 
     res = (df,)
     if return_drop:
         res += (drop_list,)
 
     if return_iv:
-        res += (pd.Series(iv, index = f.columns),)
+        res += (pd.Series(iv, index=f.columns),)
 
     return unpack_tuple(res)
 
 
-def drop_vif(frame, threshold = 3, return_drop = False, exclude = None):
+def drop_vif(frame, threshold=3, return_drop=False, exclude=None):
     """variance inflation factor
 
     Args:
@@ -461,7 +472,7 @@ def drop_vif(frame, threshold = 3, return_drop = False, exclude = None):
         cols = cols.drop(exclude)
 
     drop_list = []
-    while(True):
+    while True:
         vif = VIF(frame[cols])
 
         ix = vif.idxmax()
@@ -473,8 +484,7 @@ def drop_vif(frame, threshold = 3, return_drop = False, exclude = None):
         cols = cols.drop(ix)
         drop_list.append(ix)
 
-
-    r = frame.drop(columns = drop_list)
+    r = frame.drop(columns=drop_list)
 
     res = (r,)
     if return_drop:
@@ -483,8 +493,15 @@ def drop_vif(frame, threshold = 3, return_drop = False, exclude = None):
     return unpack_tuple(res)
 
 
-def select(frame, target = 'target', empty = 0.9, iv = 0.02, corr = 0.7,
-            return_drop = False, exclude = None):
+def select(
+    frame,
+    target="target",
+    empty=0.9,
+    iv=0.02,
+    corr=0.7,
+    return_drop=False,
+    exclude=None,
+):
     """select features by rate of empty, iv and correlation
 
     Args:
@@ -503,25 +520,41 @@ def select(frame, target = 'target', empty = 0.9, iv = 0.02, corr = 0.7,
     empty_drop = iv_drop = corr_drop = None
 
     if empty is not False:
-        frame, empty_drop = drop_empty(frame, threshold = empty, return_drop = True, exclude = exclude)
+        frame, empty_drop = drop_empty(
+            frame, threshold=empty, return_drop=True, exclude=exclude
+        )
 
     if iv is not False:
-        frame, iv_drop, iv_list = drop_iv(frame, target = target, threshold = iv, return_drop = True, return_iv = True, exclude = exclude)
+        frame, iv_drop, iv_list = drop_iv(
+            frame,
+            target=target,
+            threshold=iv,
+            return_drop=True,
+            return_iv=True,
+            exclude=exclude,
+        )
 
     if corr is not False:
-        weights = 'IV'
+        weights = "IV"
 
         if iv is not False:
             weights = iv_list
 
-        frame, corr_drop = drop_corr(frame, target = target, threshold = corr, by = weights, return_drop = True, exclude = exclude)
+        frame, corr_drop = drop_corr(
+            frame,
+            target=target,
+            threshold=corr,
+            by=weights,
+            return_drop=True,
+            exclude=exclude,
+        )
 
     res = (frame,)
     if return_drop:
         d = {
-            'empty': empty_drop,
-            'iv': iv_drop,
-            'corr': corr_drop,
+            "empty": empty_drop,
+            "iv": iv_drop,
+            "corr": corr_drop,
         }
         res += (d,)
 

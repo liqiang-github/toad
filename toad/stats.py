@@ -20,6 +20,7 @@ from .utils.decorator import Decorator, support_dataframe
 
 STATS_EMPTY = np.nan
 
+
 def gini(target):
     """get gini index of a feature
 
@@ -30,9 +31,10 @@ def gini(target):
         number: gini value
     """
     target = to_ndarray(target)
-    v, c = np.unique(target, return_counts = True)
+    v, c = np.unique(target, return_counts=True)
 
     return 1 - ((c / target.size) ** 2).sum()
+
 
 def _gini_cond(feature, target):
     """private conditional gini function
@@ -47,11 +49,12 @@ def _gini_cond(feature, target):
     size = feature.size
 
     value = 0
-    for v, c in zip(*np_unique(feature, return_counts = True)):
+    for v, c in zip(*np_unique(feature, return_counts=True)):
         target_series = target[feature == v]
         value += c / size * gini(target_series)
 
     return value
+
 
 @support_dataframe
 def gini_cond(feature, target):
@@ -77,6 +80,7 @@ def gini_cond(feature, target):
             best = v
     return best
 
+
 def entropy(target):
     """get infomation entropy of a feature
 
@@ -87,10 +91,11 @@ def entropy(target):
         number: information entropy
     """
     target = to_ndarray(target)
-    uni, counts = np.unique(target, return_counts = True)
+    uni, counts = np.unique(target, return_counts=True)
     prob = counts / len(target)
     entropy = stats.entropy(prob)
     return entropy
+
 
 def _entropy_cond(feature, target):
     """private conditional entropy func
@@ -105,11 +110,12 @@ def _entropy_cond(feature, target):
     size = len(feature)
 
     value = 0
-    for v, c in zip(*np_unique(feature, return_counts = True)):
+    for v, c in zip(*np_unique(feature, return_counts=True)):
         target_series = target[feature == v]
-        value += c/size * entropy(target_series)
+        value += c / size * entropy(target_series)
 
     return value
+
 
 @support_dataframe
 def entropy_cond(feature, target):
@@ -138,19 +144,18 @@ def entropy_cond(feature, target):
     return best
 
 
-def probability(target, mask = None):
-    """get probability of target by mask
-    """
+def probability(target, mask=None):
+    """get probability of target by mask"""
     if mask is None:
         return 1, 1
 
-    counts_0 = np_count(target, 0, default = 1)
-    counts_1 = np_count(target, 1, default = 1)
+    counts_0 = np_count(target, 0, default=1)
+    counts_1 = np_count(target, 1, default=1)
 
     sub_target = target[mask]
 
-    sub_0 = np_count(sub_target, 0, default = 1)
-    sub_1 = np_count(sub_target, 1, default = 1)
+    sub_0 = np_count(sub_target, 0, default=1)
+    sub_1 = np_count(sub_target, 1, default=1)
 
     y_prob = sub_1 / counts_1
     n_prob = sub_0 / counts_0
@@ -188,7 +193,7 @@ def _IV(feature, target):
     iv = {}
 
     for v in np.unique(feature):
-        y_prob, n_prob = probability(target, mask = (feature == v))
+        y_prob, n_prob = probability(target, mask=(feature == v))
 
         iv[v] = (y_prob - n_prob) * WOE(y_prob, n_prob)
 
@@ -197,7 +202,7 @@ def _IV(feature, target):
 
 
 @support_dataframe
-def IV(feature, target, return_sub = False, **kwargs):
+def IV(feature, target, return_sub=False, **kwargs):
     """get the IV of a feature
 
     Args:
@@ -210,13 +215,14 @@ def IV(feature, target, return_sub = False, **kwargs):
     """
     if is_continuous(feature):
         from .merge import merge
+
         feature = merge(feature, target, **kwargs)
 
     iv, sub = _IV(feature, target)
 
     if return_sub:
         return iv, sub
-    
+
     return iv
 
 
@@ -245,10 +251,10 @@ def VIF(frame):
     if isinstance(frame, pd.DataFrame):
         index = frame.columns
         frame = frame.values
-    
+
     from sklearn.linear_model import LinearRegression
 
-    model = LinearRegression(fit_intercept = False)
+    model = LinearRegression(fit_intercept=False)
 
     l = frame.shape[1]
     vif = np.zeros(l)
@@ -260,35 +266,37 @@ def VIF(frame):
 
         pre_y = model.predict(X)
 
-        vif[i] = np.sum(y ** 2) / np.sum((pre_y - y) ** 2)
-    
-    return pd.Series(vif, index = index)
+        vif[i] = np.sum(y**2) / np.sum((pre_y - y) ** 2)
 
+    return pd.Series(vif, index=index)
 
 
 class indicator(Decorator):
-    """indicator decorator
-    """
+    """indicator decorator"""
+
     # indicator name
-    name = 'indicator'
+    name = "indicator"
     need_merge = False
     dtype = None
 
     def wrapper(self, *args, **kwargs):
         return self.call(*args, **kwargs)
 
+
 # default indicators
 INDICATORS = {
-    'iv': indicator(name = 'iv', need_merge = True)(IV),
-    'gini': indicator(name = 'gini')(gini_cond),
-    'entropy': indicator(name = 'entropy')(entropy_cond),
-    'auc': indicator(name = 'auc', dtype = np.number)(AUC),
-    'ks': indicator(name = 'ks', dtype = np.number)(KS),
-    'unique': indicator(name = 'unique')(lambda x, *arg: len(np_unique(x))),
+    "iv": indicator(name="iv", need_merge=True)(IV),
+    "gini": indicator(name="gini")(gini_cond),
+    "entropy": indicator(name="entropy")(entropy_cond),
+    "auc": indicator(name="auc", dtype=np.number)(AUC),
+    "ks": indicator(name="ks", dtype=np.number)(KS),
+    "unique": indicator(name="unique")(lambda x, *arg: len(np_unique(x))),
 }
 
 
-def column_quality(feature, target, name = 'feature', indicators = [], need_merge = False, **kwargs):
+def column_quality(
+    feature, target, name="feature", indicators=[], need_merge=False, **kwargs
+):
     """calculate quality of a feature
 
     Args:
@@ -311,9 +319,10 @@ def column_quality(feature, target, name = 'feature', indicators = [], need_merg
     bin_feature = feature
     if need_merge and is_continuous(feature):
         from .merge import merge
+
         bin_feature = merge(feature, target, **kwargs)
 
-    res = {}  
+    res = {}
     for func in indicators:
         # filter by dtype
         if func.dtype is not None and not isinstance(feature.dtype, func.dtype):
@@ -324,7 +333,7 @@ def column_quality(feature, target, name = 'feature', indicators = [], need_merg
         if func.need_merge:
             res[func.name] = func(bin_feature, target)
             continue
-        
+
         res[func.name] = func(feature, target)
 
     row = pd.Series(res)
@@ -333,14 +342,21 @@ def column_quality(feature, target, name = 'feature', indicators = [], need_merg
     return row
 
 
-def quality(dataframe, target = 'target', cpu_cores = 0, iv_only = False, indicators = ['iv', 'gini', 'entropy', 'unique'], **kwargs):
+def quality(
+    dataframe,
+    target="target",
+    cpu_cores=0,
+    iv_only=False,
+    indicators=["iv", "gini", "entropy", "unique"],
+    **kwargs
+):
     """get quality of features in data
 
     Args:
         dataframe (DataFrame): dataframe that will be calculate quality
         target (str): the target's name in dataframe
         iv_only (bool): `deprecated`. if only calculate IV
-        cpu_cores (int): the maximun number of CPU cores will be used, `0` means all CPUs will be used, 
+        cpu_cores (int): the maximun number of CPU cores will be used, `0` means all CPUs will be used,
             `-1` means all CPUs but one will be used.
 
     Returns:
@@ -350,6 +366,7 @@ def quality(dataframe, target = 'target', cpu_cores = 0, iv_only = False, indica
 
     if iv_only:
         import warnings
+
         warnings.warn(
             """`iv_only` will be deprecated soon,
                 please use `indicators = ['iv']` instead!
@@ -360,13 +377,12 @@ def quality(dataframe, target = 'target', cpu_cores = 0, iv_only = False, indica
         dummy_func = lambda x, t: STATS_EMPTY
 
         indicators = [
-            'iv',
-            indicator(name = 'gini')(dummy_func),
-            indicator(name = 'entropy')(dummy_func),
-            'unique',
+            "iv",
+            indicator(name="gini")(dummy_func),
+            indicator(name="entropy")(dummy_func),
+            "unique",
         ]
-    
-    
+
     need_merge = False
     for i, f in enumerate(indicators):
         # replace str type indicator to function
@@ -374,38 +390,37 @@ def quality(dataframe, target = 'target', cpu_cores = 0, iv_only = False, indica
             assert f in INDICATORS
 
             indicators[i] = INDICATORS[f]
-        
+
         # update need merge flag
         need_merge |= indicators[i].need_merge
-    
-    
+
     if cpu_cores < 1:
         cpu_cores = cpu_cores - 1
-    
-    
-    pool = Parallel(n_jobs = cpu_cores)
+
+    pool = Parallel(n_jobs=cpu_cores)
 
     jobs = []
     for name, series in frame.iteritems():
-        jobs.append(delayed(column_quality)(
-            series,
-            target,
-            name = name,
-            indicators = indicators,
-            need_merge = need_merge,
-            **kwargs
-        ))
+        jobs.append(
+            delayed(column_quality)(
+                series,
+                target,
+                name=name,
+                indicators=indicators,
+                need_merge=need_merge,
+                **kwargs
+            )
+        )
 
     rows = pool(jobs)
 
-
     return pd.DataFrame(rows).sort_values(
-        by = indicators[0].name,
-        ascending = False,
+        by=indicators[0].name,
+        ascending=False,
     )
 
 
-def feature_bin_stats(df_bin,feature,target):
+def feature_bin_stats(df_bin, feature, target):
     """calculate the detail info of a feature after bin
 
     Args:
@@ -415,13 +430,21 @@ def feature_bin_stats(df_bin,feature,target):
     Returns:
         DataFrame: contains good, bad, badrate, prop, y_prop, n_prop, woe, iv
     """
-    table = df_bin[[feature, target]].groupby([feature, target]).agg(len).unstack().reset_index()
-    table = table.rename(columns = {0 : 'good', 1 : 'bad'}) 
-    table['total'] = table['good'] + table['bad']
-    table['badrate'] = table['bad'] / table['total']
-    table['prop'] = table['total'] / table['total'].sum()
-    table['y_prop'] = table['good'] / table['good'].sum()
-    table['n_prop'] = table['bad'] / table['bad'].sum()
-    table['woe'] = table.apply(lambda x : WOE(x['y_prop'], x['n_prop']),axis=1)
-    table['iv'] = table.apply(lambda x : (x['y_prop'] - x['n_prop']) * WOE(x['y_prop'], x['n_prop']), axis=1)
+    table = (
+        df_bin[[feature, target]]
+        .groupby([feature, target])
+        .agg(len)
+        .unstack()
+        .reset_index()
+    )
+    table = table.rename(columns={0: "good", 1: "bad"})
+    table["total"] = table["good"] + table["bad"]
+    table["badrate"] = table["bad"] / table["total"]
+    table["prop"] = table["total"] / table["total"].sum()
+    table["y_prop"] = table["good"] / table["good"].sum()
+    table["n_prop"] = table["bad"] / table["bad"].sum()
+    table["woe"] = table.apply(lambda x: WOE(x["y_prop"], x["n_prop"]), axis=1)
+    table["iv"] = table.apply(
+        lambda x: (x["y_prop"] - x["n_prop"]) * WOE(x["y_prop"], x["n_prop"]), axis=1
+    )
     return table

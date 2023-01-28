@@ -16,8 +16,7 @@ from .utils.mixin import RulesMixin, BinsMixin
 
 
 class Transformer(TransformerMixin, RulesMixin):
-    """Base class for transformers
-    """
+    """Base class for transformers"""
 
     _fit_frame = False
 
@@ -25,13 +24,11 @@ class Transformer(TransformerMixin, RulesMixin):
     def _fitted(self):
         return len(self.rules) > 0
 
-
-    @frame_exclude(is_class = True)
-    @select_dtypes(is_class = True)
-    def fit(self, X, *args, update = False, **kwargs):
-        """fit method, see details in `fit_` method
-        """
-        dim = getattr(X, 'ndim', 1)
+    @frame_exclude(is_class=True)
+    @select_dtypes(is_class=True)
+    def fit(self, X, *args, update=False, **kwargs):
+        """fit method, see details in `fit_` method"""
+        dim = getattr(X, "ndim", 1)
 
         rules = {}
 
@@ -39,15 +36,15 @@ class Transformer(TransformerMixin, RulesMixin):
             rules = self.fit_(X, *args, **kwargs)
 
         elif dim == 1:
-            name = getattr(X, 'name', self._default_name)
+            name = getattr(X, "name", self._default_name)
             rules[name] = self.fit_(X, *args, **kwargs)
 
         else:
             if len(args) > 0:
                 X, y = split_target(X, args[0])
                 args = (y, *args[1:])
-            if 'y' in kwargs:
-                X, kwargs['y'] = split_target(X, kwargs['y'])
+            if "y" in kwargs:
+                X, kwargs["y"] = split_target(X, kwargs["y"])
 
             self._check_duplicated_keys(X)
 
@@ -62,21 +59,18 @@ class Transformer(TransformerMixin, RulesMixin):
 
         return self
 
-
     def transform(self, X, *args, **kwargs):
-        """transform method, see details in `transform_` method
-        """
+        """transform method, see details in `transform_` method"""
         if not self._fitted:
             return self._raise_unfitted()
-
 
         if self._fit_frame:
             return self.transform_(self.rules, X, *args, **kwargs)
 
-        if getattr(X, 'ndim', 1) == 1 and not isinstance(X, dict):
+        if getattr(X, "ndim", 1) == 1 and not isinstance(X, dict):
             if len(self.rules) == 1:
                 return self.transform_(self.default_rule(), X, *args, **kwargs)
-            elif hasattr(X, 'name') and X.name in self:
+            elif hasattr(X, "name") and X.name in self:
                 return self.transform_(self.rules[X.name], X, *args, **kwargs)
             else:
                 return X
@@ -89,28 +83,24 @@ class Transformer(TransformerMixin, RulesMixin):
                 try:
                     res[key] = self.transform_(self.rules[key], X[key], *args, **kwargs)
                 except Exception as e:
-                    e.args += ('on column "{key}"'.format(key = key),)
+                    e.args += ('on column "{key}"'.format(key=key),)
                     raise e
 
         return res
 
-
     def _raise_unfitted(self):
-        raise Exception('transformer is unfitted yet!')
-    
+        raise Exception("transformer is unfitted yet!")
 
     def _check_duplicated_keys(self, X):
         if isinstance(X, pd.DataFrame) and X.columns.has_duplicates:
             keys = X.columns[X.columns.duplicated()].values
-            raise Exception("X has duplicate keys `{keys}`".format(keys = str(keys)))
-        
+            raise Exception("X has duplicate keys `{keys}`".format(keys=str(keys)))
+
         return True
 
 
-
 class WOETransformer(Transformer):
-    """WOE transformer
-    """
+    """WOE transformer"""
 
     def fit_(self, X, y):
         """fit WOE transformer
@@ -127,16 +117,16 @@ class WOETransformer(Transformer):
         woe = np.zeros(l)
 
         for i in range(l):
-            y_prob, n_prob = probability(y, mask = (X == value[i]))
+            y_prob, n_prob = probability(y, mask=(X == value[i]))
 
             woe[i] = WOE(y_prob, n_prob)
 
         return {
-            'value': value,
-            'woe': woe,
+            "value": value,
+            "woe": woe,
         }
 
-    def transform_(self, rule, X, default = 'min'):
+    def transform_(self, rule, X, default="min"):
         """transform function for single feature
 
         Args:
@@ -149,16 +139,16 @@ class WOETransformer(Transformer):
         X = to_ndarray(X)
         res = np.zeros(X.shape)
 
-        value = rule['value']
-        woe = rule['woe']
+        value = rule["value"]
+        woe = rule["woe"]
 
-        if default == 'min':
+        if default == "min":
             default = np.min(woe)
-        elif default == 'max':
+        elif default == "max":
             default = np.max(woe)
 
         # replace unknown group to default value
-        res[np.isin(X, value, invert = True)] = default
+        res[np.isin(X, value, invert=True)] = default
 
         for i in range(len(value)):
             res[X == value[i]] = woe[i]
@@ -166,21 +156,19 @@ class WOETransformer(Transformer):
         return res
 
     def _format_rule(self, rule):
-        return dict(zip(rule['value'], rule['woe']))
+        return dict(zip(rule["value"], rule["woe"]))
 
     def _parse_rule(self, rule):
         return {
-            'value': np.array(list(rule.keys())),
-            'woe': np.array(list(rule.values())),
+            "value": np.array(list(rule.keys())),
+            "woe": np.array(list(rule.values())),
         }
 
 
-
 class Combiner(Transformer, BinsMixin):
-    """Combiner for merge data
-    """
+    """Combiner for merge data"""
 
-    def fit_(self, X, y = None, method = 'chi', empty_separate = False, **kwargs):
+    def fit_(self, X, y=None, method="chi", empty_separate=False, **kwargs):
         """fit combiner
 
         Args:
@@ -195,16 +183,19 @@ class Combiner(Transformer, BinsMixin):
         if y is not None:
             y = to_ndarray(y)
 
-
         if not np.issubdtype(X.dtype, np.number):
             if y is None:
-                raise ValueError("Can not combine `{dtype}` type in X, if you want to combine this type columns, please pass argument `y` to deal with it".format(dtype = X.dtype))
+                raise ValueError(
+                    "Can not combine `{dtype}` type in X, if you want to combine this type columns, please pass argument `y` to deal with it".format(
+                        dtype=X.dtype
+                    )
+                )
 
             # transform raw data by woe
             transer = WOETransformer()
             woe = transer.fit_transform(X, y)
             # find unique value and its woe value
-            uni_val, ix_val = np.unique(X, return_index = True)
+            uni_val, ix_val = np.unique(X, return_index=True)
             uni_woe = woe[ix_val]
             # sort value by woe
             ix = np.argsort(uni_woe)
@@ -213,25 +204,23 @@ class Combiner(Transformer, BinsMixin):
             # replace X by sorted index
             X = self._raw_to_bin(X, uni_val)
 
-            _, splits = merge(X, target = y, method = method, return_splits = True, **kwargs)
+            _, splits = merge(X, target=y, method=method, return_splits=True, **kwargs)
 
             return self._covert_splits(uni_val, splits)
-        
 
         mask = pd.isna(X)
         if mask.any() and empty_separate:
             X = X[~mask]
             y = y[~mask]
-        
-        _, splits = merge(X, target = y, method = method, return_splits = True, **kwargs)
+
+        _, splits = merge(X, target=y, method=method, return_splits=True, **kwargs)
 
         if mask.any() and empty_separate:
             splits = np.append(splits, np.nan)
-        
+
         return splits
 
-
-    def transform_(self, rule, X, labels = False, ellipsis = 16, **kwargs):
+    def transform_(self, rule, X, labels=False, ellipsis=16, **kwargs):
         """transform X by combiner
 
         Args:
@@ -249,7 +238,7 @@ class Combiner(Transformer, BinsMixin):
             bins = self._raw_to_bin(X, rule)
 
         else:
-            bins = np.zeros(X.shape, dtype = int)
+            bins = np.zeros(X.shape, dtype=int)
 
             if len(rule):
                 # empty to a separate group
@@ -261,17 +250,15 @@ class Combiner(Transformer, BinsMixin):
                     bins = bin_by_splits(X, rule)
 
         if labels:
-            formated = self.format_bins(rule, index = True, ellipsis = ellipsis)
-            empty_mask = (bins == self.EMPTY_BIN)
+            formated = self.format_bins(rule, index=True, ellipsis=ellipsis)
+            empty_mask = bins == self.EMPTY_BIN
             bins = formated[bins]
             bins[empty_mask] = self.EMPTY_BIN
 
         return bins
 
-
     def _covert_splits(self, value, splits):
-        """covert combine rules to array
-        """
+        """covert combine rules to array"""
         if value is False:
             return splits
 
@@ -287,8 +274,7 @@ class Combiner(Transformer, BinsMixin):
 
         l.append(value[start:])
 
-        return np.array(l, dtype = object)
-
+        return np.array(l, dtype=object)
 
     def _raw_to_bin(self, X, splits):
         """bin by splits
@@ -312,8 +298,7 @@ class Combiner(Transformer, BinsMixin):
 
         return bins
 
-
-    def set_rules(self, map, reset = False):
+    def set_rules(self, map, reset=False):
         """set rules for combiner
 
         Args:
@@ -324,6 +309,7 @@ class Combiner(Transformer, BinsMixin):
             self
         """
         import warnings
+
         warnings.warn(
             """`combiner.set_rules` will be deprecated soon,
                 use `combiner.load(rules, update = False)` instead!
@@ -331,32 +317,28 @@ class Combiner(Transformer, BinsMixin):
             DeprecationWarning,
         )
 
-
-        self.load(map, update = not reset)
+        self.load(map, update=not reset)
 
         return self
 
     def _parse_rule(self, rule):
         return np.array(rule)
 
-    def _format_rule(self, rule, format = False):
+    def _format_rule(self, rule, format=False):
         if format:
             rule = self.format_bins(rule)
 
         return rule.tolist()
 
 
-
-
 class GBDTTransformer(Transformer):
-    """GBDT transformer
-    """
+    """GBDT transformer"""
+
     _fit_frame = True
 
     def __init__(self):
         self.gbdt = None
         self.onehot = None
-
 
     def fit_(self, X, y, **kwargs):
         """fit GBDT transformer
@@ -380,10 +362,9 @@ class GBDTTransformer(Transformer):
         onehot = OneHotEncoder().fit(X)
 
         return {
-            'gbdt': gbdt,
-            'onehot': onehot,
+            "gbdt": gbdt,
+            "onehot": onehot,
         }
-
 
     def transform_(self, rules, X):
         """transform woe
@@ -394,7 +375,7 @@ class GBDTTransformer(Transformer):
         Returns:
             array-like
         """
-        X = rules['gbdt'].apply(X)
+        X = rules["gbdt"].apply(X)
         X = X.reshape(-1, X.shape[1])
-        res = rules['onehot'].transform(X).toarray()
+        res = rules["onehot"].transform(X).toarray()
         return res

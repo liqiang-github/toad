@@ -4,8 +4,8 @@ from .earlystop import earlystopping
 from .trainer import Trainer
 
 __all__ = [
-    'History',
-    'callback',
-    'earlystopping',
-    'Trainer',
+    "History",
+    "callback",
+    "earlystopping",
+    "Trainer",
 ]

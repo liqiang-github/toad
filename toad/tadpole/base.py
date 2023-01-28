@@ -5,6 +5,7 @@ from .utils import (
     FIG_SIZE,
 )
 
+
 class Tadpole:
     def __getattr__(self, name):
         t = getattr(sns, name)
@@ -15,10 +16,10 @@ class Tadpole:
 
     def wrapsns(self, f):
         @tadpole_axes
-        def wrapper(*args, figure_size = FIG_SIZE, **kwargs):
+        def wrapper(*args, figure_size=FIG_SIZE, **kwargs):
             kw = kwargs.copy()
-            if 'ax' not in kw:
-                kw['ax'] = get_axes(size = figure_size)
+            if "ax" not in kw:
+                kw["ax"] = get_axes(size=figure_size)
 
             try:
                 return f(*args, **kw)

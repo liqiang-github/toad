@@ -11,14 +11,22 @@ from .utils.mixin import RulesMixin, BinsMixin
 
 NUMBER_EMPTY = -9999999
 NUMBER_INF = 1e10
-FACTOR_EMPTY = 'MISSING'
-FACTOR_UNKNOWN = 'UNKNOWN'
-
+FACTOR_EMPTY = "MISSING"
+FACTOR_UNKNOWN = "UNKNOWN"
 
 
 class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
-    def __init__(self, pdo = 60, rate = 2, base_odds = 35, base_score = 750,
-        card = None, combiner = {}, transer = None, **kwargs):
+    def __init__(
+        self,
+        pdo=60,
+        rate=2,
+        base_odds=35,
+        base_score=750,
+        card=None,
+        combiner={},
+        transer=None,
+        **kwargs,
+    ):
         """
 
         Args:
@@ -46,6 +54,7 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         if card is not None:
             # self.generate_card(card = card)
             import warnings
+
             warnings.warn(
                 """`ScoreCard(card = {.....})` will be deprecated soon,
                     use `ScoreCard().load({.....})` instead!
@@ -54,40 +63,38 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
             )
 
             self.load(card)
-        
+
     @property
     def coef_(self):
-        """ coef of LR model
-        """
+        """coef of LR model"""
         return self.model.coef_[0]
-    
+
     @property
     def intercept_(self):
         return self.model.intercept_[0]
-    
+
     @property
     def n_features_(self):
         return (self.coef_ != 0).sum()
-    
+
     @property
     def features_(self):
         if not self._feature_names:
             self._feature_names = list(self.rules.keys())
-        
+
         return self._feature_names
-    
+
     @property
     def combiner(self):
         if not self._combiner:
             # generate a new combiner if not exists
             rules = {}
             for key in self.rules:
-                rules[key] = self.rules[key]['bins']
-            
-            self._combiner = Combiner().load(rules)
-        
-        return self._combiner
+                rules[key] = self.rules[key]["bins"]
 
+            self._combiner = Combiner().load(rules)
+
+        return self._combiner
 
     def fit(self, X, y):
         """
@@ -99,17 +106,14 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
 
         for f in self.features_:
             if f not in self.transer:
-                raise Exception('column \'{f}\' is not in transer'.format(f = f))
+                raise Exception("column '{f}' is not in transer".format(f=f))
 
         self.model.fit(X, y)
         self.rules = self._generate_rules()
 
         # keep sub_score-median of each feature, as `base_effect` for reason-calculation
         sub_score = self.woe_to_score(X)
-        self.base_effect = pd.Series(
-            np.median(sub_score, axis=0),
-            index = self.features_
-        )
+        self.base_effect = pd.Series(np.median(sub_score, axis=0), index=self.features_)
 
         return self
 
@@ -126,24 +130,24 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         """
         if isinstance(X, pd.DataFrame):
             X = X[self.features_]
-        
+
         bins = self.combiner.transform(X)
         res = self.bin_to_score(bins, **kwargs)
         return res
 
-    def get_reason(self, X, base_effect = None, threshold_score = None, keep = 3):
+    def get_reason(self, X, base_effect=None, threshold_score=None, keep=3):
         """
         calculate top-effect-of-features as reasons
 
         Args:
             X (2D DataFrame): X to find reason
-            base_effect (Series): base effect score of each feature 
+            base_effect (Series): base effect score of each feature
             threshold_score (float): threshold to find top k most important features,
                 show the highest top k features when prediction score > threshold
                 and show the lowest top k when prediction score <= threshold
                 default is the sum of `base_effect` score
             keep(int): top k most important reasons to keep, default `3`
-        
+
         Returns:
             DataFrame: top k most important reasons for each feature
         """
@@ -151,60 +155,60 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         # use the memory during `fit()` by default
         if base_effect is None:
             base_effect = self.base_effect
-        
+
         # use zero-vector if scorecard doesn't have `base_effect`
-        if base_effect is None:  
-            base_effect = pd.Series(0, index = self.features_)
-        
+        if base_effect is None:
+            base_effect = pd.Series(0, index=self.features_)
+
         # set default threshold score
         if threshold_score is None:
             threshold_score = np.sum(base_effect.values)
 
         # get score and sub scores
-        score, sub = self.predict(X, return_sub = True)
+        score, sub = self.predict(X, return_sub=True)
 
         bias = sub - base_effect
         # find direction for each row, `-1` means keep high bias, `1` keeps low bias
         direction = 1 - 2 * (score > threshold_score).reshape(-1, 1).astype(np.uint8)
 
         # sort by bias and keep top k columns
-        idx = np.argsort(direction * bias.values, axis = -1)[:,:keep]
+        idx = np.argsort(direction * bias.values, axis=-1)[:, :keep]
         # get effect data by sorted index
-        effect_bias = np.take_along_axis(sub.values, idx, axis = -1)
-        effect_values = np.take_along_axis(X[self.features_].values, idx, axis = -1)
+        effect_bias = np.take_along_axis(sub.values, idx, axis=-1)
+        effect_values = np.take_along_axis(X[self.features_].values, idx, axis=-1)
         effect_feats = np.take(self.features_, idx)
 
         # merge effect data into a DataFrame
         effect_matrix = np.dstack((effect_feats.T, effect_bias.T, effect_values.T))
         cols = pd.MultiIndex.from_product(
-            [[f"top{i}" for i in range(1, keep+1)], ['feats', 'bias', 'value']]
+            [[f"top{i}" for i in range(1, keep + 1)], ["feats", "bias", "value"]]
         )
         reason = pd.DataFrame(
             np.hstack(effect_matrix),
-            columns = cols,
+            columns=cols,
         )
 
         return reason
 
-
-    def bin_to_score(self, bins, return_sub = False, default = 'min'):
-        """predict score from bins
-        """
+    def bin_to_score(self, bins, return_sub=False, default="min"):
+        """predict score from bins"""
         score = 0
         res = bins.copy()
         for col, rule in self.rules.items():
-            s_map = rule['scores']
+            s_map = rule["scores"]
             b = bins[col]
 
             # set default value for empty group
             default_value = default
-            if default == 'min':
+            if default == "min":
                 default_value = np.min(s_map)
-            elif default == 'max':
+            elif default == "max":
                 default_value = np.max(s_map)
             elif isinstance(default, str):
-                raise ValueError(f'default `{default}` is not valid, only support `min`, `max` or number')
-            
+                raise ValueError(
+                    f"default `{default}` is not valid, only support `min`, `max` or number"
+                )
+
             # append default value to the end of score map
             s_map = np.append(s_map, default_value)
 
@@ -223,24 +227,22 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         else:
             return score
 
-
     def predict_proba(self, X):
         """predict probability
 
         Args:
             X (2D array-like): X to predict
-        
+
         Returns:
             2d array: probability of all classes
         """
         proba = self.score_to_proba(self.predict(X))
         return np.stack((1 - proba, proba), axis=1)
-    
 
     def _generate_rules(self):
         if not self._check_rules(self.combiner, self.transer):
-            raise Exception('generate failed')
-        
+            raise Exception("generate failed")
+
         rules = {}
 
         for idx, key in enumerate(self.features_):
@@ -248,51 +250,56 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
 
             if weight == 0:
                 continue
-            
-            woe = self.transer[key]['woe']
-            
-            rules[key] = {
-                'bins': self.combiner[key],
-                'woes': woe,
-                'weight': weight,
-                'scores': self.woe_to_score(woe, weight = weight),
-            }
-        
-        return rules
 
+            woe = self.transer[key]["woe"]
+
+            rules[key] = {
+                "bins": self.combiner[key],
+                "woes": woe,
+                "weight": weight,
+                "scores": self.woe_to_score(woe, weight=weight),
+            }
+
+        return rules
 
     def _check_rules(self, combiner, transer):
         for col in self.features_:
             if col not in combiner:
-                raise Exception('column \'{col}\' is not in combiner'.format(col = col))
-            
+                raise Exception("column '{col}' is not in combiner".format(col=col))
+
             if col not in transer:
-                raise Exception('column \'{col}\' is not in transer'.format(col = col))
+                raise Exception("column '{col}' is not in transer".format(col=col))
 
             l_c = len(combiner[col])
-            l_t = len(transer[col]['woe'])
+            l_t = len(transer[col]["woe"])
 
             if l_c == 0:
                 continue
 
             if np.issubdtype(combiner[col].dtype, np.number):
                 if l_c != l_t - 1:
-                    raise Exception('column \'{col}\' is not matched, assert {l_t} bins but given {l_c}'.format(col = col, l_t = l_t, l_c = l_c + 1))
+                    raise Exception(
+                        "column '{col}' is not matched, assert {l_t} bins but given {l_c}".format(
+                            col=col, l_t=l_t, l_c=l_c + 1
+                        )
+                    )
             else:
                 if l_c != l_t:
-                    raise Exception('column \'{col}\' is not matched, assert {l_t} bins but given {l_c}'.format(col = col, l_t = l_t, l_c = l_c))
+                    raise Exception(
+                        "column '{col}' is not matched, assert {l_t} bins but given {l_c}".format(
+                            col=col, l_t=l_t, l_c=l_c
+                        )
+                    )
 
         return True
 
-
     def proba_to_score(self, prob):
         """covert probability to score
-        
+
         odds = (1 - prob) / prob
         score = factor * log(odds) * offset
         """
         return self.factor * (np.log(1 - prob) - np.log(prob)) + self.offset
-    
 
     def score_to_proba(self, score):
         """covert score to probability
@@ -302,10 +309,8 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         """
         return 1 / (np.e ** ((score - self.offset) / self.factor) + 1)
 
-
-    def woe_to_score(self, woe, weight = None):
-        """calculate score by woe
-        """
+    def woe_to_score(self, woe, weight=None):
+        """calculate score by woe"""
         woe = to_ndarray(woe)
 
         if weight is None:
@@ -321,30 +326,27 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
 
         return (s + b / self.n_features_) * mask
 
-
     def _parse_rule(self, rule, **kwargs):
         bins = self.parse_bins(list(rule.keys()))
         scores = np.array(list(rule.values()))
 
         return {
-            'bins': bins,
-            'scores': scores,
+            "bins": bins,
+            "scores": scores,
         }
-    
-    def _format_rule(self, rule, decimal = 2, **kwargs):
-        bins = self.format_bins(rule['bins'])
-        scores = np.around(rule['scores'], decimals = decimal).tolist()
-        
+
+    def _format_rule(self, rule, decimal=2, **kwargs):
+        bins = self.format_bins(rule["bins"])
+        scores = np.around(rule["scores"], decimals=decimal).tolist()
+
         return dict(zip(bins, scores))
 
-
     def after_load(self, rules):
-        """after load card
-        """
+        """after load card"""
         # reset combiner
         self._combiner = {}
 
-    def after_export(self, card, to_frame = False, to_json = None, to_csv = None, **kwargs):
+    def after_export(self, card, to_frame=False, to_json=None, to_csv=None, **kwargs):
         """generate a scorecard object
 
         Args:
@@ -362,23 +364,22 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
             rows = list()
             for name in card:
                 for value, score in card[name].items():
-                    rows.append({
-                        'name': name,
-                        'value': value,
-                        'score': score,
-                    })
+                    rows.append(
+                        {
+                            "name": name,
+                            "value": value,
+                            "score": score,
+                        }
+                    )
 
             card = pd.DataFrame(rows)
-
 
         if to_csv is not None:
             return card.to_csv(to_csv)
 
         return card
 
-
-
-    def _generate_testing_frame(self, maps, size = 'max', mishap = True, gap = 1e-2):
+    def _generate_testing_frame(self, maps, size="max", mishap=True, gap=1e-2):
         """
         Args:
             maps (dict): map of values or splits to generate frame
@@ -420,7 +421,7 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
 
         # get size
         if isinstance(size, str):
-            if size == 'lcm':
+            if size == "lcm":
                 size = np.lcm.reduce(lens)
             else:
                 size = np.max(lens)
@@ -443,6 +444,6 @@ class ScoreCard(BaseEstimator, RulesMixin, BinsMixin):
         maps = self.combiner.export()
 
         frame = self._generate_testing_frame(maps, **kwargs)
-        frame['score'] = self.predict(frame)
+        frame["score"] = self.predict(frame)
 
         return frame

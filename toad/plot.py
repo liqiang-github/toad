@@ -9,9 +9,18 @@ from .tadpole import tadpole
 from .tadpole.utils import HEATMAP_CMAP, MAX_STYLE, add_annotate, add_text, reset_ylim
 from .utils import unpack_tuple, generate_str
 
-def badrate_plot(frame, x = None, target = 'target', by = None,
-                freq = None, format = None, return_counts = False,
-                return_proportion = False, return_frame = False):
+
+def badrate_plot(
+    frame,
+    x=None,
+    target="target",
+    by=None,
+    freq=None,
+    format=None,
+    return_counts=False,
+    return_proportion=False,
+    return_frame=False,
+):
     """plot for badrate
 
     Args:
@@ -41,34 +50,33 @@ def badrate_plot(frame, x = None, target = 'target', by = None,
 
     grouper = x
     if freq is not None:
-        frame.loc[:, x] = pd.to_datetime(frame[x], format = format)
-        grouper = pd.Grouper(key = x, freq = freq)
+        frame.loc[:, x] = pd.to_datetime(frame[x], format=format)
+        grouper = pd.Grouper(key=x, freq=freq)
 
     if by is not None:
         grouper = [by, grouper]
 
         styles_count = frame[by].nunique()
         if styles_count > MAX_STYLE:
-            markers = ['o'] * styles_count
+            markers = ["o"] * styles_count
 
     group = frame.groupby(grouper)
-    table = group[target].agg(['sum', 'count']).reset_index()
-    table['badrate'] = table['sum'] / table['count']
+    table = group[target].agg(["sum", "count"]).reset_index()
+    table["badrate"] = table["sum"] / table["count"]
 
     # set number dtype to object
     if np.issubdtype(table[x].dtype, np.number):
         table[x] = table[x].astype(str)
 
-
     rate_plot = tadpole.lineplot(
-        x = x,
-        y = 'badrate',
-        hue = by,
-        style = by,
-        data = table,
-        legend = 'full',
-        markers = markers,
-        dashes = False,
+        x=x,
+        y="badrate",
+        hue=by,
+        style=by,
+        data=table,
+        legend="full",
+        markers=markers,
+        dashes=False,
     )
 
     # set y axis start with 0
@@ -78,28 +86,26 @@ def badrate_plot(frame, x = None, target = 'target', by = None,
 
     if return_counts:
         count_plot = tadpole.barplot(
-            x = x,
-            y = 'count',
-            hue = by,
-            data = table,
+            x=x,
+            y="count",
+            hue=by,
+            data=table,
         )
         res += (count_plot,)
 
-
     if return_proportion:
-        table['prop'] = 0
+        table["prop"] = 0
         for v in table[x].unique():
-            mask = (table[x] == v)
-            table.loc[mask, 'prop'] = table[mask]['count'] / table[mask]['count'].sum()
+            mask = table[x] == v
+            table.loc[mask, "prop"] = table[mask]["count"] / table[mask]["count"].sum()
 
         prop_plot = tadpole.barplot(
-            x = x,
-            y = 'prop',
-            hue = by,
-            data = table,
+            x=x,
+            y="prop",
+            hue=by,
+            data=table,
         )
         res += (prop_plot,)
-
 
     if return_frame:
         res += (table,)
@@ -107,7 +113,7 @@ def badrate_plot(frame, x = None, target = 'target', by = None,
     return unpack_tuple(res)
 
 
-def corr_plot(frame, figure_size = (20, 15)):
+def corr_plot(frame, figure_size=(20, 15)):
     """plot for correlation
 
     Args:
@@ -117,28 +123,28 @@ def corr_plot(frame, figure_size = (20, 15)):
     """
     corr = frame.corr()
 
-    mask = np.zeros_like(corr, dtype = np.bool)
+    mask = np.zeros_like(corr, dtype=bool)
     mask[np.triu_indices_from(mask)] = True
 
     map_plot = tadpole.heatmap(
         corr,
-        mask = mask,
-        cmap = HEATMAP_CMAP,
-        vmax = 1,
-        vmin = -1,
-        center = 0,
-        square = True,
-        cbar_kws = {"shrink": .5},
-        linewidths = .5,
-        annot = True,
-        fmt = '.2f',
-        figure_size = figure_size,
+        mask=mask,
+        cmap=HEATMAP_CMAP,
+        vmax=1,
+        vmin=-1,
+        center=0,
+        square=True,
+        cbar_kws={"shrink": 0.5},
+        linewidths=0.5,
+        annot=True,
+        fmt=".2f",
+        figure_size=figure_size,
     )
 
     return map_plot
 
 
-def proportion_plot(x = None, keys = None):
+def proportion_plot(x=None, keys=None):
     """plot for comparing proportion in different dataset
 
     Args:
@@ -153,34 +159,37 @@ def proportion_plot(x = None, keys = None):
 
     if keys is None:
         keys = [
-            x[ix].name
-            if hasattr(x[ix], 'name') and x[ix].name is not None
-            else ix
+            x[ix].name if hasattr(x[ix], "name") and x[ix].name is not None else ix
             for ix in range(len(x))
         ]
     elif isinstance(keys, str):
         keys = [keys]
 
     x = map(pd.Series, x)
-    data = pd.concat(x, keys = keys, names = ['keys']).reset_index()
-    data = data.rename(columns = {data.columns[2]: 'value'})
+    data = pd.concat(x, keys=keys, names=["keys"]).reset_index()
+    data = data.rename(columns={data.columns[2]: "value"})
 
-    prop_data = data.groupby('keys')['value'].value_counts(
-        normalize = True,
-        dropna = False,
-    ).rename('proportion').reset_index()
+    prop_data = (
+        data.groupby("keys")["value"]
+        .value_counts(
+            normalize=True,
+            dropna=False,
+        )
+        .rename("proportion")
+        .reset_index()
+    )
 
     prop_plot = tadpole.barplot(
-        x = 'value',
-        y = 'proportion',
-        hue = 'keys',
-        data = prop_data,
+        x="value",
+        y="proportion",
+        hue="keys",
+        data=prop_data,
     )
 
     return prop_plot
 
 
-def roc_plot(score, target, compare = None, figsize = (14, 10)):
+def roc_plot(score, target, compare=None, figsize=(14, 10)):
     """plot for roc
 
     Args:
@@ -191,22 +200,23 @@ def roc_plot(score, target, compare = None, figsize = (14, 10)):
     Returns:
         Axes
     """
-    auc, fpr, tpr, thresholds = AUC(score, target, return_curve = True)
+    auc, fpr, tpr, thresholds = AUC(score, target, return_curve=True)
 
-    fig, ax = plt.subplots(1, 1, figsize = figsize)
-    ax.plot(fpr, tpr, label = 'ROC curve (area = %0.5f)' % auc)
-    ax.fill_between(fpr, tpr, alpha = 0.3)
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    ax.plot(fpr, tpr, label="ROC curve (area = %0.5f)" % auc)
+    ax.fill_between(fpr, tpr, alpha=0.3)
     if compare is not None:
-        c_aux, c_fpr, c_tpr, _ = AUC(compare, target, return_curve = True)
-        ax.plot(c_fpr, c_tpr,label = 'ROC compare (area = %0.5f)' % c_aux)
-        ax.fill_between(c_fpr, c_tpr, alpha = 0.3)
+        c_aux, c_fpr, c_tpr, _ = AUC(compare, target, return_curve=True)
+        ax.plot(c_fpr, c_tpr, label="ROC compare (area = %0.5f)" % c_aux)
+        ax.fill_between(c_fpr, c_tpr, alpha=0.3)
 
-    ax.plot([0, 1], [0, 1], color = 'red', linestyle = '--')
-    plt.legend(loc = "lower right")
+    ax.plot([0, 1], [0, 1], color="red", linestyle="--")
+    plt.legend(loc="lower right")
 
     return ax
 
-def ks_plot(score, target, figsize = (14, 10)):
+
+def ks_plot(score, target, figsize=(14, 10)):
     """plot for ks
 
     Args:
@@ -218,11 +228,11 @@ def ks_plot(score, target, figsize = (14, 10)):
         Axes
     """
     fpr, tpr, thresholds = roc_curve(target, score)
-    
-    fig, ax = plt.subplots(1, 1, figsize = figsize)
-    ax.plot(thresholds[1 : ], tpr[1 : ], label = 'tpr')
-    ax.plot(thresholds[1 : ], fpr[1 : ], label = 'fpr')
-    ax.plot(thresholds[1 : ], (tpr - fpr)[1 : ], label = 'ks')
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    ax.plot(thresholds[1:], tpr[1:], label="tpr")
+    ax.plot(thresholds[1:], fpr[1:], label="fpr")
+    ax.plot(thresholds[1:], (tpr - fpr)[1:], label="ks")
 
     ax.invert_xaxis()
     ax.legend()
@@ -230,12 +240,15 @@ def ks_plot(score, target, figsize = (14, 10)):
     ks_value = max(tpr - fpr)
     x = np.argwhere(abs(fpr - tpr) == ks_value)[0, 0]
     thred_value = thresholds[x]
-    ax.axvline(thred_value, color = 'r', linestyle = '--')
-    plt.title(f'ks:{ks_value:.5f}    threshold:{thred_value:.5f}')
+    ax.axvline(thred_value, color="r", linestyle="--")
+    plt.title(f"ks:{ks_value:.5f}    threshold:{thred_value:.5f}")
 
     return ax
 
-def bin_plot(frame, x = None, target = 'target', iv = True, annotate_format = ".2f", return_frame = False):
+
+def bin_plot(
+    frame, x=None, target="target", iv=True, annotate_format=".2f", return_frame=False
+):
     """plot for bins
 
     Args:
@@ -255,37 +268,37 @@ def bin_plot(frame, x = None, target = 'target', iv = True, annotate_format = ".
         temp_name = generate_str()
         frame[temp_name] = target
         target = temp_name
-    
+
     table = feature_bin_stats(frame, x, target)
     prop_ax = tadpole.barplot(
-        x = x,
-        y = 'prop',
-        data = table,
-        color = '#82C6E2',
+        x=x,
+        y="prop",
+        data=table,
+        color="#82C6E2",
     )
 
-    prop_ax = add_annotate(prop_ax, format = annotate_format)
+    prop_ax = add_annotate(prop_ax, format=annotate_format)
 
     badrate_ax = prop_ax.twinx()
     badrate_ax.grid(False)
 
     badrate_ax = tadpole.lineplot(
-        x = x,
-        y = 'badrate',
-        data = table,
-        color = '#D65F5F',
-        ax = badrate_ax,
+        x=x,
+        y="badrate",
+        data=table,
+        color="#D65F5F",
+        ax=badrate_ax,
     )
 
     badrate_ax.set_ylim([0, None])
-    badrate_ax = add_annotate(badrate_ax, format = annotate_format)
+    badrate_ax = add_annotate(badrate_ax, format=annotate_format)
 
     if iv:
         prop_ax = reset_ylim(prop_ax)
-        prop_ax = add_text(prop_ax, 'IV: {:.5f}'.format(table['iv'].sum()))
+        prop_ax = add_text(prop_ax, "IV: {:.5f}".format(table["iv"].sum()))
 
     res = (prop_ax,)
-    
+
     if return_frame:
         res += (table,)
 

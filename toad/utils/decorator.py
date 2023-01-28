@@ -4,34 +4,31 @@ from .func import save_json, read_json
 from functools import wraps, WRAPPER_ASSIGNMENTS
 
 
-
 class Decorator:
-    """base decorater class
-    """
+    """base decorater class"""
+
     _cls = None
     is_class = False
 
-    def __init__(self, *args, is_class = False, **kwargs):
+    def __init__(self, *args, is_class=False, **kwargs):
         self.is_class = is_class
 
         if len(args) == 1 and callable(args[0]):
             self.fn = args[0]
         else:
             self.setup(*args, **kwargs)
-    
 
     @property
     def fn(self):
-        if hasattr(self, '__wrapped__'):
+        if hasattr(self, "__wrapped__"):
             return self.__wrapped__
-        
         return None
-    
+
     @fn.setter
     def fn(self, func):
-        if hasattr(self, 'setup_func'):
+        if hasattr(self, "setup_func"):
             func = self.setup_func(func)
-        
+
         self.__wrapped__ = func
 
     def __call__(self, *args, **kwargs):
@@ -45,8 +42,7 @@ class Decorator:
 
         return self.wrapper(*args, **kwargs)
 
-
-    def __get__(self, instance, type = None):
+    def __get__(self, instance, type=None):
         self.is_class = True
         self._cls = instance
 
@@ -56,13 +52,11 @@ class Decorator:
 
         return func
 
-
     def __getattribute__(self, name):
         if name in WRAPPER_ASSIGNMENTS:
             return getattr(self.__wrapped__, name)
 
         return object.__getattribute__(self, name)
-
 
     def setup(self, *args, **kwargs):
         for key in kwargs:
@@ -79,31 +73,29 @@ class Decorator:
 
 
 class frame_exclude(Decorator):
-    """decorator for exclude columns
-    """
+    """decorator for exclude columns"""
 
-    def wrapper(self, X, *args, exclude = None, **kwargs):
+    def wrapper(self, X, *args, exclude=None, **kwargs):
         if exclude is not None and isinstance(X, pd.DataFrame):
-            X = X.drop(columns = exclude)
+            X = X.drop(columns=exclude)
 
         return self.call(X, *args, **kwargs)
 
 
 class select_dtypes(Decorator):
-    """ decorator for select frame by dtypes
-    """
+    """decorator for select frame by dtypes"""
 
-    def wrapper(self, X, *args, select_dtypes = None, **kwargs):
+    def wrapper(self, X, *args, select_dtypes=None, **kwargs):
         if select_dtypes is not None and isinstance(X, pd.DataFrame):
-            X = X.select_dtypes(include = select_dtypes)
+            X = X.select_dtypes(include=select_dtypes)
 
         return self.call(X, *args, **kwargs)
 
 
 class save_to_json(Decorator):
-    """support save result to json file
-    """
-    def wrapper(self, *args, to_json = None, **kwargs):
+    """support save result to json file"""
+
+    def wrapper(self, *args, to_json=None, **kwargs):
         res = self.call(*args, **kwargs)
 
         if to_json is not None:
@@ -113,15 +105,15 @@ class save_to_json(Decorator):
 
 
 class load_from_json(Decorator):
-    """support load data from json file
-    """
+    """support load data from json file"""
+
     require_first = False
 
-    def wrapper(self, *args, from_json = None, **kwargs):
+    def wrapper(self, *args, from_json=None, **kwargs):
         if from_json is not None:
             obj = read_json(from_json)
             args = (obj, *args)
-        
+
         elif self.require_first and len(args) > 0 and isinstance(args[0], str):
             obj = read_json(args[0])
             args = (obj, *args[1:])
@@ -130,10 +122,10 @@ class load_from_json(Decorator):
 
 
 class support_dataframe(Decorator):
-    """decorator for supporting dataframe
-    """
+    """decorator for supporting dataframe"""
+
     require_target = True
-    target = 'target'
+    target = "target"
 
     def wrapper(self, frame, *args, **kwargs):
         if not isinstance(frame, pd.DataFrame):
@@ -156,13 +148,14 @@ class support_dataframe(Decorator):
             res[col] = r
         return pd.DataFrame(res)
 
+
 class proxy_docstring(Decorator):
     method_name = None
-    
+
     def __get__(self, *args):
         func = super().__get__(*args)
-        
+
         if self.method_name is not None and hasattr(self._cls, self.method_name):
-            setattr(func, '__doc__', getattr(self._cls, self.method_name).__doc__)
-        
+            setattr(func, "__doc__", getattr(self._cls, self.method_name).__doc__)
+
         return func

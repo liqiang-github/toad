@@ -24,7 +24,7 @@ class DictDataset(Dataset):
         return self.x.shape[0]
 
     def __getitem__(self, item):
-        return self.x[item], {'y': self.y[item]}
+        return self.x[item], {"y": self.y[item]}
 
 
 class ListDataset(Dataset):
@@ -48,7 +48,7 @@ class TestDictModel(Module):
 
     def forward(self, x):
         x = self.linear(x)
-        return {'y': F.relu(x)}
+        return {"y": F.relu(x)}
 
     def fit_step(self, batch, loss=None):
         x, y = batch

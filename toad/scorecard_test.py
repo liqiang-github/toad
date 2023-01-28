@@ -9,46 +9,48 @@ np.random.seed(1)
 
 # Create a testing dataframe and a scorecard model.
 
-ab = np.array(list('ABCDEFG'))
-feature = np.random.randint(10, size = 500)
-target = np.random.randint(2, size = 500)
+ab = np.array(list("ABCDEFG"))
+feature = np.random.randint(10, size=500)
+target = np.random.randint(2, size=500)
 str_feat = ab[np.random.choice(7, 500)]
 
-df = pd.DataFrame({
-    'A': feature,
-    'B': str_feat,
-    'C': ab[np.random.choice(2, 500)],
-    'D': np.ones(500),
-})
+df = pd.DataFrame(
+    {
+        "A": feature,
+        "B": str_feat,
+        "C": ab[np.random.choice(2, 500)],
+        "D": np.ones(500),
+    }
+)
 
 card_config = {
-    'A': {
-        '[-inf ~ 3)': 100,
-        '[3 ~ 5)': 200,
-        '[5 ~ 8)': 300,
-        '[8 ~ inf)': 400,
-        'nan': 500,
+    "A": {
+        "[-inf ~ 3)": 100,
+        "[3 ~ 5)": 200,
+        "[5 ~ 8)": 300,
+        "[8 ~ inf)": 400,
+        "nan": 500,
     },
-    'B': {
-        ','.join(list('ABCD')): 200,
-        ','.join(list('EF')): 400,
-        'else': 500,
+    "B": {
+        ",".join(list("ABCD")): 200,
+        ",".join(list("EF")): 400,
+        "else": 500,
     },
-    'C': {
-        'A': 200,
-        'B': 100,
+    "C": {
+        "A": 200,
+        "B": 100,
     },
 }
 
 combiner = Combiner()
-bins = combiner.fit_transform(df, target, n_bins = 5)
+bins = combiner.fit_transform(df, target, n_bins=5)
 woe_transer = WOETransformer()
 woe = woe_transer.fit_transform(bins, target)
 
 # create a score card
 card = ScoreCard(
-    combiner = combiner,
-    transer = woe_transer,
+    combiner=combiner,
+    transer=woe_transer,
 )
 card.fit(woe, target)
 
@@ -69,8 +71,8 @@ def test_load():
 
 def test_load_after_init_combiner():
     card = ScoreCard(
-        combiner = combiner,
-        transer = woe_transer,
+        combiner=combiner,
+        transer=woe_transer,
     )
     card.load(card_config)
     score = card.predict(df)
@@ -108,13 +110,15 @@ def test_card_feature_effect():
     FEATURE_EFFECT is manually calculated with following logic:
     FEATURE_EFFECT = np.median(card.woe_to_score(df),axis = 0)
     """
-    FEATURE_EFFECT = pytest.approx(np.array([142.26722434, 152.81922244, 148.82801326, 0.]), FUZZ_THRESHOLD)
+    FEATURE_EFFECT = pytest.approx(
+        np.array([142.26722434, 152.81922244, 148.82801326, 0.0]), FUZZ_THRESHOLD
+    )
     assert card.base_effect.values == FEATURE_EFFECT
 
 
 def test_predict_sub_score():
     score, sub = card.predict(df, return_sub=True)
-    assert sub.loc[250, 'B'] == pytest.approx(162.0781460573475, FUZZ_THRESHOLD)
+    assert sub.loc[250, "B"] == pytest.approx(162.0781460573475, FUZZ_THRESHOLD)
 
 
 def test_woe_to_score():
@@ -130,7 +134,7 @@ def test_bin_to_score():
 
 def test_export_map():
     card_map = card.export()
-    assert card_map['B']['D'] == 159.24
+    assert card_map["B"]["D"] == 159.24
 
 
 def test_card_map():
@@ -149,19 +153,19 @@ def test_card_map_with_else():
 def test_generate_testing_frame():
     card = ScoreCard().load(card_config)
     frame = card.testing_frame()
-    assert frame.loc[4, 'B'] == 'E'
+    assert frame.loc[4, "B"] == "E"
 
 
 def test_export_frame():
     card = ScoreCard().load(card_config)
     frame = card.export(to_frame=True)
-    rows = frame[(frame['name'] == 'B') & (frame['value'] == 'else')].reset_index()
-    assert rows.loc[0, 'score'] == 500
+    rows = frame[(frame["name"] == "B") & (frame["value"] == "else")].reset_index()
+    assert rows.loc[0, "score"] == 500
 
 
 def test_card_combiner_number_not_match():
     c = combiner.export()
-    c['A'] = [0, 3, 6, 8]
+    c["A"] = [0, 3, 6, 8]
     com = Combiner().load(c)
     bins = com.transform(df)
     woe_transer = WOETransformer()
@@ -176,12 +180,12 @@ def test_card_combiner_number_not_match():
         # will raise an exception when fitting a card
         card.fit(woe, target)
 
-    assert '\'A\' is not matched' in str(e.value)
+    assert "'A' is not matched" in str(e.value)
 
 
 def test_card_combiner_str_not_match():
     c = combiner.export()
-    c['C'] = [['A'], ['B'], ['C']]
+    c["C"] = [["A"], ["B"], ["C"]]
     com = Combiner().load(c)
     bins = com.transform(df)
     woe_transer = WOETransformer()
@@ -196,11 +200,11 @@ def test_card_combiner_str_not_match():
         # will raise an exception when fitting a card
         card.fit(woe, target)
 
-    assert '\'C\' is not matched' in str(e.value)
+    assert "'C' is not matched" in str(e.value)
 
 
 def test_card_with_less_X():
-    x = woe.drop(columns='A')
+    x = woe.drop(columns="A")
     card = ScoreCard(
         combiner=combiner,
         transer=woe_transer,
@@ -213,27 +217,29 @@ def test_card_with_less_X():
 def test_card_predict_with_unknown_feature():
     np.random.seed(9)
     unknown_df = df.copy()
-    unknown_df.loc[200, 'C'] = 'U'
-    assert card.predict(unknown_df)[200] == pytest.approx(456.38815204610216, FUZZ_THRESHOLD)
+    unknown_df.loc[200, "C"] = "U"
+    assert card.predict(unknown_df)[200] == pytest.approx(
+        456.38815204610216, FUZZ_THRESHOLD
+    )
 
 
 def test_card_predict_with_unknown_feature_default_max():
     np.random.seed(9)
     unknown_df = df.copy()
-    unknown_df.loc[200, 'C'] = 'U'
-    score, sub = card.predict(unknown_df, default = 'max', return_sub = True)
+    unknown_df.loc[200, "C"] = "U"
+    score, sub = card.predict(unknown_df, default="max", return_sub=True)
 
-    assert sub.loc[200, 'C'] == card['C']['scores'].max()
+    assert sub.loc[200, "C"] == card["C"]["scores"].max()
     assert score[200] == pytest.approx(462.26441488588785, FUZZ_THRESHOLD)
 
 
 def test_card_predict_with_unknown_feature_default_with_value():
     np.random.seed(9)
     unknown_df = df.copy()
-    unknown_df.loc[200, 'C'] = 'U'
-    score, sub = card.predict(unknown_df, default = 42, return_sub = True)
-    
-    assert sub.loc[200, 'C'] == 42
+    unknown_df.loc[200, "C"] = "U"
+    score, sub = card.predict(unknown_df, default=42, return_sub=True)
+
+    assert sub.loc[200, "C"] == 42
     assert score[200] == pytest.approx(355.4364016252907, FUZZ_THRESHOLD)
 
 
@@ -254,12 +260,11 @@ def test_get_reason_vector():
     find_largest_top_3:  A(+9) B(+6) D(+0)
     """
     reason = card.get_reason(df)
-    assert reason.iloc[404]['top1'].tolist() == ['C', 142.95175042081146, 'B']
+    assert reason.iloc[404]["top1"].tolist() == ["C", 142.95175042081146, "B"]
 
 
 @pytest.mark.timeout(0.007)
 def test_predict_dict():
-    """ a test for scalar inference time cost """
+    """a test for scalar inference time cost"""
     proba = card.predict(df.iloc[404].to_dict())
     assert proba == TEST_SCORE
-
